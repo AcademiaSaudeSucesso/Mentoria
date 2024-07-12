@@ -1,7 +1,7 @@
 #Python 3.12.3
 import os, csv
 from datetime import datetime
-from flask import Flask, render_template,redirect,url_for, request
+from flask import Flask, render_template,redirect,url_for, request 
 import openpyxl.workbook
 from form import FormSubscribe
 from secret import SECRET_KEY
@@ -9,6 +9,9 @@ from flask_mail import Mail, Message
 import my_secret_data
 from twilio.rest import Client
 from openpyxl import Workbook, load_workbook
+import gspread
+from google.oauth2.service_account import Credentials
+
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = SECRET_KEY
@@ -19,13 +22,14 @@ app.config['MAIL_USE_SSL'] = True
 app.config['MAIL_USERNAME'] = my_secret_data.MAIL_USERNAME
 app.config['MAIL_PASSWORD'] = my_secret_data.MAIL_PASSWORD
 app.config['MAIL_DEFAULT_SENDER'] = my_secret_data.MAIL_SENDER
+
+
 mail=Mail(app)
 
 
 account_sid = my_secret_data.ACCOUNT_SID
 auth_token = my_secret_data.AUTH_TOKEN
 client = Client(account_sid, auth_token)
-
 
 countries_list = {
     "Afghanistan": "+93",
@@ -227,8 +231,23 @@ countries_list = {
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 users_csv_file_path = os.path.join(BASE_DIR, 'users.csv')
+credentials_file_path = os.path.join(BASE_DIR, 'credentials.json')
 users_xlsx_file_path = BASE_DIR + '/users.xlsx'
 field_names = ['Date','Name', 'Country', 'Whatsapp']
+
+
+def connect_and_insert_new_data_into_google_sheets(new_rec:list):
+    scopes = [
+    "https://www.googleapis.com/auth/spreadsheets"
+]
+    creds = Credentials.from_service_account_file('credentials.json', scopes=scopes)
+
+    client = gspread.authorize(creds)
+    SHEET_ID = "1957zv5nNuQyZ3W4DoM41ThCyJaoWQGqJArKlNiCQJkM"
+    sheet = client.open_by_key(SHEET_ID)
+
+    values_list = sheet.sheet1.append_row(new_rec)
+    
 
 def create_exel_file_users():
     wb = Workbook()
@@ -268,6 +287,7 @@ def add_new_rec_to_xlsx(new_rec_xl):
     if not is_exist_whatsapp_number(new_rec_xl[-1]):
         sheet.append(new_rec_xl)
         wb.save('users.xlsx')
+        connect_and_insert_new_data_into_google_sheets(new_rec_xl)
     else:
         print(f"{new_rec_xl[-1]} ALREADY EXISTS!!!")
         return True
@@ -369,3 +389,8 @@ def get_couontry_code(country):
 
 if __name__ == '__main__':
     app.run(debug=False)
+
+
+
+#todo gravar o users no disc com o nome Users_mentoria
+#todo media a partir de 900px para baixo mudar a primeira imagem de dotora
